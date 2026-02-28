@@ -3,7 +3,7 @@ import React from "react";
 function Shop({ userId }) {
 
   const addToCart = async (productId) => {
-    await fetch("http://localhost:5000/cart", {
+    await fetch("http://api/cart", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -16,7 +16,7 @@ function Shop({ userId }) {
   };
 
   const checkout = async () => {
-    await fetch("http://localhost:5000/checkout", {
+    await fetch("http://api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

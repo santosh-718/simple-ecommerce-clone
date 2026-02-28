@@ -4,7 +4,7 @@ function Login({ setUserId }) {
   const [form, setForm] = useState({ email: "", password: "" });
 
   const login = async () => {
-    const res = await fetch("http://localhost:5000/login", {
+    const res = await fetch("http://api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
