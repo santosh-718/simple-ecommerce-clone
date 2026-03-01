@@ -1,3 +1,45 @@
+import React, { useState } from "react";
+import Login from "./Login";
+import Register from "./Register";
+import Shop from "./Shop";
+
+function App() {
+  const [page, setPage] = useState("login");
+  const [userId, setUserId] = useState(null);
+
+  if (userId) {
+    return <Shop userId={userId} />;
+  }
+
+  return (
+    <div style={styles.container}>
+      <div style={styles.overlay}></div>
+      <header style={styles.header}>
+        <h1 style={styles.title}>Bhagya Jewelleries</h1>
+        <p style={styles.tagline}>Where Elegance Meets Tradition</p>
+      </header>
+
+      <div style={styles.card}>
+        {page === "login" ? (
+          <>
+            <Login setUserId={setUserId} />
+            <p onClick={() => setPage("register")} style={styles.link}>
+              Don’t have an account? Register
+            </p>
+          </>
+        ) : (
+          <>
+            <Register />
+            <p onClick={() => setPage("login")} style={styles.link}>
+              Already have an account? Login
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const styles = {
   container: {
     minHeight: "100vh",
@@ -72,3 +114,5 @@ const styles = {
     boxShadow: "0 0 15px rgba(255,215,0,0.8)",
   },
 };
+
+export default App;
