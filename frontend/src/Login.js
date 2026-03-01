@@ -55,7 +55,7 @@ function Login({ setUserId }) {
         </button>
 
         <p style={styles.footer}>
-          Don’t have an account? <a href="/signup" style={styles.link}>Sign up</a>
+          Don’t have an account? <a href="/register" style={styles.link}>Register</a>
         </p>
       </div>
     </div>
