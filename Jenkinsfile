@@ -64,23 +64,28 @@ pipeline {
             }
         }
 
-        stage('Deploy to EKS') {
-            steps {
-                sh """
-                aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
+       stage('Deploy to EKS') {
+    steps {
+        sh """
+        aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
 
-                kubectl apply -f k8s/namespace.yaml
+        # Create namespace if not exists
+        kubectl apply -f k8s/namespace.yaml
 
-                kubectl set image deployment/backend \
-                backend=${ECR_BACKEND}:${IMAGE_TAG} \
-                -n ${NAMESPACE}
+        # Apply deployments and services (first time creation)
+        kubectl apply -f k8s/
 
-                kubectl set image deployment/frontend \
-                frontend=${ECR_FRONTEND}:${IMAGE_TAG} \
-                -n ${NAMESPACE}
-                """
-            }
-        }
+        # Update image (rolling update)
+        kubectl set image deployment/backend \
+        backend=${ECR_BACKEND}:${IMAGE_TAG} \
+        -n ${NAMESPACE}
+
+        kubectl set image deployment/frontend \
+        frontend=${ECR_FRONTEND}:${IMAGE_TAG} \
+        -n ${NAMESPACE}
+        """
+    }
+}
 
         stage('Verify Deployment') {
             steps {
