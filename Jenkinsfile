@@ -2,11 +2,11 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'ap-south-1'
-        ACCOUNT_ID = '<ACCOUNT_ID>'
+        AWS_REGION = 'us-east-1'
+        ACCOUNT_ID = '675550799998'
         ECR_BACKEND = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/backend"
         ECR_FRONTEND = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/frontend"
-        CLUSTER_NAME = 'ecommerce-cluster'
+        CLUSTER_NAME = 'demoeks'
     }
 
     stages {
