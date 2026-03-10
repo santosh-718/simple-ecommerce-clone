@@ -59,42 +59,40 @@ pipeline {
         }
 
         stage('Deploy to EKS') {
-            steps {
-                sh """
-                aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
+    steps {
+        sh """
+        aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
 
-                # Ensure namespace exists
-                kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+        # Ensure namespace exists
+        kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 
-                # Apply PVC first (so Postgres can bind storage)
-                kubectl apply -f k8s/postgres-pvc.yaml -n ${NAMESPACE}
+        # Apply PVC first
+        kubectl apply -f k8s/postgres-pvc.yaml -n ${NAMESPACE}
 
-                # Apply Postgres deployment + service
-                kubectl apply -f k8s/postgres-deployment.yaml -n ${NAMESPACE}
-                kubectl apply -f k8s/postgres-service.yaml -n ${NAMESPACE}
+        # Apply Postgres deployment + service
+        kubectl apply -f k8s/postgres-deployment.yaml -n ${NAMESPACE}
+        kubectl apply -f k8s/postgres-service.yaml -n ${NAMESPACE}
 
-                # Wait until Postgres is running before init job
-                kubectl rollout status deployment/postgres -n ${NAMESPACE} --timeout=120s
+        # Wait for Postgres to be ready
+        kubectl rollout status deployment/postgres -n ${NAMESPACE} --timeout=180s
 
-                # Apply init-db job (recreate if exists)
-                kubectl delete job init-db -n ${NAMESPACE} --ignore-not-found
-                kubectl apply -f k8s/init-db-job.yaml -n ${NAMESPACE}
+        # Recreate init-db job
+        kubectl delete job init-db -n ${NAMESPACE} --ignore-not-found
+        kubectl apply -f k8s/init-db-job.yaml -n ${NAMESPACE}
 
-                # Apply backend + frontend deployments/services
-                kubectl apply -f k8s/backend-deployment.yaml -n ${NAMESPACE}
-                kubectl apply -f k8s/backend-service.yaml -n ${NAMESPACE}
-                kubectl apply -f k8s/frontend-deployment.yaml -n ${NAMESPACE}
-                kubectl apply -f k8s/frontend-service.yaml -n ${NAMESPACE}
+        # Apply backend + frontend
+        kubectl apply -f k8s/backend-deployment.yaml -n ${NAMESPACE}
+        kubectl apply -f k8s/backend-service.yaml -n ${NAMESPACE}
+        kubectl apply -f k8s/frontend-deployment.yaml -n ${NAMESPACE}
+        kubectl apply -f k8s/frontend-service.yaml -n ${NAMESPACE}
 
-                # Rolling update with new images
-                kubectl set image deployment/backend \
-                  backend=${ECR_BACKEND}:${IMAGE_TAG} -n ${NAMESPACE}
+        # Update images
+        kubectl set image deployment/backend backend=${ECR_BACKEND}:${IMAGE_TAG} -n ${NAMESPACE}
+        kubectl set image deployment/frontend frontend=${ECR_FRONTEND}:${IMAGE_TAG} -n ${NAMESPACE}
+        """
+    }
+}
 
-                kubectl set image deployment/frontend \
-                  frontend=${ECR_FRONTEND}:${IMAGE_TAG} -n ${NAMESPACE}
-                """
-            }
-        }
 
         stage('Verify Deployment') {
             steps {
