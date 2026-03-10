@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-db
+spec:
+  template:
+    spec:
+      containers:
+        - name: init-db
+          image: postgres:15
+          command: ["psql"]
+          args:
+            [
+              "-h", "postgres-service",
+              "-U", "ecommerce_user",
+              "-d", "ecommerce",
+              "-c", "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name VARCHAR(100), email VARCHAR(100) UNIQUE, password VARCHAR(200), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"
+            ]
+          env:
+            - name: PGPASSWORD
+              value: strongpassword
+      restartPolicy: OnFailure
