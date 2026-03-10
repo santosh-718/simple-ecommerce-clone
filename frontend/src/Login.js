@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-function Login({ setUserId }) {
+function Login({ setUserId, setPage }) {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -9,7 +9,7 @@ function Login({ setUserId }) {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("http:/api/login", {
+      const res = await fetch("http://localhost:5000/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -17,7 +17,7 @@ function Login({ setUserId }) {
 
       const data = await res.json();
       if (data.token) {
-        setUserId(1);
+        setUserId(1); // replace with actual userId from backend
       } else {
         setError("Invalid email or password");
       }
@@ -55,7 +55,10 @@ function Login({ setUserId }) {
         </button>
 
         <p style={styles.footer}>
-          Don’t have an account? <a href="/register" style={styles.link}>Register</a>
+          Don’t have an account?{" "}
+          <span onClick={() => setPage("register")} style={styles.link}>
+            Register
+          </span>
         </p>
       </div>
     </div>
@@ -63,67 +66,15 @@ function Login({ setUserId }) {
 }
 
 const styles = {
-  container: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    height: "100vh",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    fontFamily: "Arial, sans-serif",
-  },
-  card: {
-    background: "#fff",
-    padding: "40px",
-    borderRadius: "12px",
-    boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
-    width: "350px",
-    textAlign: "center",
-  },
-  title: {
-    marginBottom: "10px",
-    fontSize: "24px",
-    fontWeight: "bold",
-    color: "#333",
-  },
-  subtitle: {
-    marginBottom: "20px",
-    fontSize: "14px",
-    color: "#666",
-  },
-  input: {
-    width: "100%",
-    padding: "12px",
-    marginBottom: "15px",
-    borderRadius: "8px",
-    border: "1px solid #ddd",
-    fontSize: "14px",
-  },
-  button: {
-    width: "100%",
-    padding: "12px",
-    backgroundColor: "#667eea",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    fontSize: "16px",
-    cursor: "pointer",
-    transition: "background 0.3s",
-  },
-  error: {
-    color: "red",
-    fontSize: "13px",
-    marginBottom: "10px",
-  },
-  footer: {
-    marginTop: "20px",
-    fontSize: "13px",
-    color: "#555",
-  },
-  link: {
-    color: "#667eea",
-    textDecoration: "none",
-    fontWeight: "bold",
-  },
+  container: { display: "flex", justifyContent: "center", alignItems: "center" },
+  card: { width: "350px", padding: "40px", background: "#fff", borderRadius: "12px" },
+  title: { fontSize: "24px", fontWeight: "bold" },
+  subtitle: { marginBottom: "20px", fontSize: "14px" },
+  input: { width: "100%", padding: "12px", marginBottom: "15px" },
+  button: { width: "100%", padding: "12px", backgroundColor: "#667eea", color: "#fff" },
+  error: { color: "red", fontSize: "13px" },
+  footer: { marginTop: "20px", fontSize: "13px" },
+  link: { color: "#667eea", cursor: "pointer", fontWeight: "bold" },
 };
 
 export default Login;
