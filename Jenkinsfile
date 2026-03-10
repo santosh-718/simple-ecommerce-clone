@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         AWS_REGION   = 'us-east-1'
-        ACCOUNT_ID   = '675550799998'      // change if needed
+        ACCOUNT_ID   = '675550799998'
         CLUSTER_NAME = 'demoeks'
         NAMESPACE    = 'ecommerce'
 
@@ -46,46 +46,38 @@ pipeline {
             }
         }
 
-        stage('Tag Images') {
+        stage('Tag & Push Images') {
             steps {
                 sh """
                 docker tag backend:${IMAGE_TAG} ${ECR_BACKEND}:${IMAGE_TAG}
                 docker tag frontend:${IMAGE_TAG} ${ECR_FRONTEND}:${IMAGE_TAG}
-                """
-            }
-        }
 
-        stage('Push Images') {
-            steps {
-                sh """
                 docker push ${ECR_BACKEND}:${IMAGE_TAG}
                 docker push ${ECR_FRONTEND}:${IMAGE_TAG}
                 """
             }
         }
 
-       stage('Deploy to EKS') {
-    steps {
-        sh """
-        aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
+        stage('Deploy to EKS') {
+            steps {
+                sh """
+                aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
 
-        # Create namespace if not exists
-        kubectl apply -f k8s/namespace.yaml
+                # Ensure namespace exists
+                kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 
-        # Apply deployments and services (first time creation)
-        kubectl apply -f k8s/
+                # Apply all manifests
+                kubectl apply -f k8s/ -n ${NAMESPACE}
 
-        # Update image (rolling update)
-        kubectl set image deployment/backend \
-        backend=${ECR_BACKEND}:${IMAGE_TAG} \
-        -n ${NAMESPACE}
+                # Update images (rolling update)
+                kubectl set image deployment/backend \
+                  backend=${ECR_BACKEND}:${IMAGE_TAG} -n ${NAMESPACE}
 
-        kubectl set image deployment/frontend \
-        frontend=${ECR_FRONTEND}:${IMAGE_TAG} \
-        -n ${NAMESPACE}
-        """
-    }
-}
+                kubectl set image deployment/frontend \
+                  frontend=${ECR_FRONTEND}:${IMAGE_TAG} -n ${NAMESPACE}
+                """
+            }
+        }
 
         stage('Verify Deployment') {
             steps {
