@@ -66,10 +66,27 @@ pipeline {
                 # Ensure namespace exists
                 kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 
-                # Apply all manifests
-                kubectl apply -f k8s/ -n ${NAMESPACE}
+                # Apply PVC first (so Postgres can bind storage)
+                kubectl apply -f k8s/postgres-pvc.yaml -n ${NAMESPACE}
 
-                # Update images (rolling update)
+                # Apply Postgres deployment + service
+                kubectl apply -f k8s/postgres-deployment.yaml -n ${NAMESPACE}
+                kubectl apply -f k8s/postgres-service.yaml -n ${NAMESPACE}
+
+                # Wait until Postgres is running before init job
+                kubectl rollout status deployment/postgres -n ${NAMESPACE} --timeout=120s
+
+                # Apply init-db job (recreate if exists)
+                kubectl delete job init-db -n ${NAMESPACE} --ignore-not-found
+                kubectl apply -f k8s/init-db-job.yaml -n ${NAMESPACE}
+
+                # Apply backend + frontend deployments/services
+                kubectl apply -f k8s/backend-deployment.yaml -n ${NAMESPACE}
+                kubectl apply -f k8s/backend-service.yaml -n ${NAMESPACE}
+                kubectl apply -f k8s/frontend-deployment.yaml -n ${NAMESPACE}
+                kubectl apply -f k8s/frontend-service.yaml -n ${NAMESPACE}
+
+                # Rolling update with new images
                 kubectl set image deployment/backend \
                   backend=${ECR_BACKEND}:${IMAGE_TAG} -n ${NAMESPACE}
 
