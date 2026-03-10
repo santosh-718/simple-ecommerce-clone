@@ -16,15 +16,11 @@ pipeline {
     stages {
 
         stage('Clean Workspace') {
-            steps {
-                deleteDir()
-            }
+            steps { deleteDir() }
         }
 
         stage('Checkout Code') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
         stage('Build Docker Images') {
@@ -51,7 +47,6 @@ pipeline {
                 sh """
                 docker tag backend:${IMAGE_TAG} ${ECR_BACKEND}:${IMAGE_TAG}
                 docker tag frontend:${IMAGE_TAG} ${ECR_FRONTEND}:${IMAGE_TAG}
-
                 docker push ${ECR_BACKEND}:${IMAGE_TAG}
                 docker push ${ECR_FRONTEND}:${IMAGE_TAG}
                 """
@@ -59,42 +54,43 @@ pipeline {
         }
 
         stage('Deploy to EKS') {
-    steps {
-        sh """
-        aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
+            steps {
+                sh """
+                aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
 
-        # Ensure namespace exists
-        kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                # Ensure namespace exists
+                kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 
-        # Apply PVC first
-        kubectl apply -f k8s/postgres-pvc.yaml -n ${NAMESPACE}
+                # Apply PVC
+                kubectl apply -f k8s/postgres-pvc.yaml -n ${NAMESPACE}
 
-        # Wait for PVC to bind
-        kubectl wait pvc/postgres-pvc --for=condition=Bound --timeout=180s -n ${NAMESPACE}
+                # Wait for PVC to bind
+                kubectl wait pvc/postgres-pvc --for=condition=Bound --timeout=180s -n ${NAMESPACE} || {
+                  echo "PVC did not bind. Check EBS CSI driver and IAM permissions."
+                  exit 1
+                }
 
-        # Apply Postgres deployment + service
-        kubectl apply -f k8s/postgres-deployment.yaml -n ${NAMESPACE}
-        kubectl apply -f k8s/postgres-service.yaml -n ${NAMESPACE}
+                # Deploy Postgres
+                kubectl apply -f k8s/postgres-deployment.yaml -n ${NAMESPACE}
+                kubectl apply -f k8s/postgres-service.yaml -n ${NAMESPACE}
+                kubectl rollout status deployment/postgres -n ${NAMESPACE} --timeout=180s
 
-        # Wait until Postgres is running
-        kubectl rollout status deployment/postgres -n ${NAMESPACE} --timeout=180s
+                # Init DB Job
+                kubectl delete job init-db -n ${NAMESPACE} --ignore-not-found
+                kubectl apply -f k8s/init-db-job.yaml -n ${NAMESPACE}
 
-        # Recreate init-db job
-        kubectl delete job init-db -n ${NAMESPACE} --ignore-not-found
-        kubectl apply -f k8s/init-db-job.yaml -n ${NAMESPACE}
+                # Deploy backend/frontend
+                kubectl apply -f k8s/backend-deployment.yaml -n ${NAMESPACE}
+                kubectl apply -f k8s/backend-service.yaml -n ${NAMESPACE}
+                kubectl apply -f k8s/frontend-deployment.yaml -n ${NAMESPACE}
+                kubectl apply -f k8s/frontend-service.yaml -n ${NAMESPACE}
 
-        # Apply backend + frontend
-        kubectl apply -f k8s/backend-deployment.yaml -n ${NAMESPACE}
-        kubectl apply -f k8s/backend-service.yaml -n ${NAMESPACE}
-        kubectl apply -f k8s/frontend-deployment.yaml -n ${NAMESPACE}
-        kubectl apply -f k8s/frontend-service.yaml -n ${NAMESPACE}
-
-        # Update images
-        kubectl set image deployment/backend backend=${ECR_BACKEND}:${IMAGE_TAG} -n ${NAMESPACE}
-        kubectl set image deployment/frontend frontend=${ECR_FRONTEND}:${IMAGE_TAG} -n ${NAMESPACE}
-        """
-    }
-}
+                # Rolling update with new images
+                kubectl set image deployment/backend backend=${ECR_BACKEND}:${IMAGE_TAG} -n ${NAMESPACE}
+                kubectl set image deployment/frontend frontend=${ECR_FRONTEND}:${IMAGE_TAG} -n ${NAMESPACE}
+                """
+            }
+        }
 
         stage('Verify Deployment') {
             steps {
@@ -107,19 +103,13 @@ pipeline {
 
         stage('Check Init Job Logs') {
             steps {
-                sh """
-                kubectl logs job/init-db -n ${NAMESPACE} || true
-                """
+                sh "kubectl logs job/init-db -n ${NAMESPACE} || true"
             }
         }
     }
 
     post {
-        success {
-            echo "✅ Deployment Successful - Build ${BUILD_NUMBER}"
-        }
-        failure {
-            echo "❌ Deployment Failed - Check Logs"
-        }
+        success { echo "✅ Deployment Successful - Build ${BUILD_NUMBER}" }
+        failure { echo "❌ Deployment Failed - Check Logs" }
     }
 }
