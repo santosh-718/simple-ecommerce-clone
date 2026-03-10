@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-function Login({ setUserId, setPage }) {
+function Login({ setUserId }) {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -53,13 +53,6 @@ function Login({ setUserId, setPage }) {
         <button style={styles.button} onClick={login} disabled={loading}>
           {loading ? "Logging in..." : "Login"}
         </button>
-
-        <p style={styles.footer}>
-          Don’t have an account?{" "}
-          <span onClick={() => setPage("register")} style={styles.link}>
-            Register
-          </span>
-        </p>
       </div>
     </div>
   );
@@ -73,8 +66,6 @@ const styles = {
   input: { width: "100%", padding: "12px", marginBottom: "15px" },
   button: { width: "100%", padding: "12px", backgroundColor: "#667eea", color: "#fff" },
   error: { color: "red", fontSize: "13px" },
-  footer: { marginTop: "20px", fontSize: "13px" },
-  link: { color: "#667eea", cursor: "pointer", fontWeight: "bold" },
 };
 
 export default Login;
