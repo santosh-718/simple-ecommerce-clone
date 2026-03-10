@@ -4,7 +4,7 @@ metadata:
   name: backend
   namespace: ecommerce
 spec:
-  replicas: 2
+  replicas: 2   # keep your working replica count
   selector:
     matchLabels:
       app: backend
@@ -14,7 +14,18 @@ spec:
         app: backend
     spec:
       containers:
-      - name: backend
-        image: 675550799998.dkr.ecr.us-east-1.amazonaws.com/backend:latest
-        ports:
-        - containerPort: 5000
+        - name: backend
+          image: 675550799998.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DB_HOST
+              value: postgres-service
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: admin
+            - name: DB_PASSWORD
+              value: admin
+            - name: DB_NAME
+              value: ecommerce
