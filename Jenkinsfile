@@ -64,8 +64,10 @@ pipeline {
 
                 # Ensure namespace exists
                 kubectl create namespace \${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                kubectl apply -f gp3-storageclass.yaml
 
                 # Apply PVC
+                kubectl delete pvc postgres-pvc -n ecommerce
                 kubectl apply -f k8s/postgres-pvc.yaml -n \${NAMESPACE}
 
                 # Deploy Postgres (this triggers PVC binding because of WaitForFirstConsumer)
