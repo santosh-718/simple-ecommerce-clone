@@ -14,7 +14,6 @@ pipeline {
     }
 
     stages {
-
         stage('Clean Workspace') {
             steps {
                 deleteDir()
@@ -30,8 +29,8 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 sh """
-                docker build -t backend:${IMAGE_TAG} ./backend
-                docker build -t frontend:${IMAGE_TAG} ./frontend
+                    docker build -t backend:${IMAGE_TAG} ./backend
+                    docker build -t frontend:${IMAGE_TAG} ./frontend
                 """
             }
         }
@@ -39,9 +38,9 @@ pipeline {
         stage('Login to ECR') {
             steps {
                 sh """
-                aws ecr get-login-password --region \${AWS_REGION} | \
-                docker login --username AWS --password-stdin \
-                \${ACCOUNT_ID}.dkr.ecr.\${AWS_REGION}.amazonaws.com
+                    aws ecr get-login-password --region \${AWS_REGION} | \
+                    docker login --username AWS --password-stdin \
+                    \${ACCOUNT_ID}.dkr.ecr.\${AWS_REGION}.amazonaws.com
                 """
             }
         }
@@ -49,10 +48,10 @@ pipeline {
         stage('Tag & Push Images') {
             steps {
                 sh """
-                docker tag backend:${IMAGE_TAG} \${ECR_BACKEND}:${IMAGE_TAG}
-                docker tag frontend:${IMAGE_TAG} \${ECR_FRONTEND}:${IMAGE_TAG}
-                docker push \${ECR_BACKEND}:${IMAGE_TAG}
-                docker push \${ECR_FRONTEND}:${IMAGE_TAG}
+                    docker tag backend:${IMAGE_TAG} \${ECR_BACKEND}:${IMAGE_TAG}
+                    docker tag frontend:${IMAGE_TAG} \${ECR_FRONTEND}:${IMAGE_TAG}
+                    docker push \${ECR_BACKEND}:${IMAGE_TAG}
+                    docker push \${ECR_FRONTEND}:${IMAGE_TAG}
                 """
             }
         }
@@ -60,42 +59,53 @@ pipeline {
         stage('Deploy to EKS') {
             steps {
                 sh """
-                aws eks --region \${AWS_REGION} update-kubeconfig --name \${CLUSTER_NAME}
+                    aws eks --region \${AWS_REGION} update-kubeconfig --name \${CLUSTER_NAME}
 
-                # Ensure namespace exists
-                kubectl create namespace \${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-                kubectl apply -f k8s/gp3-storageclass.yaml
+                    # Ensure namespace exists
+                    kubectl create namespace \${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                    kubectl apply -f k8s/gp3-storageclass.yaml
 
-                # Clean up old PVC/PV if stuck
-                kubectl delete pvc postgres-pvc -n \${NAMESPACE} --ignore-not-found --grace-period=0 --force
-                kubectl patch pvc postgres-pvc -n \${NAMESPACE} -p '{"metadata":{"finalizers":null}}' --type=merge || true
-                kubectl delete pv -l claimName=postgres-pvc --ignore-not-found --grace-period=0 --force
+                    # Clean up old PVC/PV if stuck
+                    kubectl delete pvc postgres-pvc -n \${NAMESPACE} --ignore-not-found --grace-period=0 --force
+                    kubectl patch pvc postgres-pvc -n \${NAMESPACE} -p '{"metadata":{"finalizers":null}}' --type=merge || true
+                    kubectl delete pv -l claimName=postgres-pvc --ignore-not-found --grace-period=0 --force
 
-                # Apply PVC fresh
-                kubectl apply -f k8s/postgres-pvc.yaml -n \${NAMESPACE}
+                    # Wait until PVC is fully gone before re-creating
+                    for i in {1..30}; do
+                        exists=\$(kubectl get pvc postgres-pvc -n \${NAMESPACE} --ignore-not-found)
+                        if [ -z "\$exists" ]; then
+                            echo "PVC fully removed"
+                            break
+                        fi
+                        echo "PVC still exists... waiting"
+                        sleep 5
+                    done
 
-                # Deploy Postgres
-                kubectl apply -f k8s/postgres-deployment.yaml -n \${NAMESPACE}
-                kubectl apply -f k8s/postgres-service.yaml -n \${NAMESPACE}
+                    # Apply PVC fresh
+                    kubectl apply -f k8s/postgres-pvc.yaml -n \${NAMESPACE}
 
-                # Wait for PVC to bind
-                for i in {1..60}; do
-                  phase=\$(kubectl get pvc postgres-pvc -n \${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
-                  if [ "\$phase" = "Bound" ]; then
-                    echo "PVC is bound!"
-                    break
-                  fi
-                  echo "PVC phase: \$phase (waiting...)"
-                  sleep 10
-                done
+                    # Deploy Postgres
+                    kubectl apply -f k8s/postgres-deployment.yaml -n \${NAMESPACE}
+                    kubectl apply -f k8s/postgres-service.yaml -n \${NAMESPACE}
 
-                if [ "\$phase" != "Bound" ]; then
-                  echo "PVC did not bind. Check EBS CSI driver and IAM permissions."
-                  exit 1
-                fi
+                    # Wait for PVC to bind
+                    for i in {1..60}; do
+                        phase=\$(kubectl get pvc postgres-pvc -n \${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+                        if [ "\$phase" = "Bound" ]; then
+                            echo "PVC is bound!"
+                            break
+                        fi
+                        echo "PVC phase: \$phase (waiting...)"
+                        sleep 10
+                    done
 
-                # Wait for Postgres rollout
-                kubectl rollout status deployment/postgres -n \${NAMESPACE} --timeout=300s
+                    if [ "\$phase" != "Bound" ]; then
+                        echo "PVC did not bind. Check EBS CSI driver and IAM permissions."
+                        exit 1
+                    fi
+
+                    # Wait for Postgres rollout
+                    kubectl rollout status deployment/postgres -n \${NAMESPACE} --timeout=300s
                 """
             }
         }
@@ -103,8 +113,8 @@ pipeline {
         stage('Verify Deployment') {
             steps {
                 sh """
-                kubectl rollout status deployment/backend -n \${NAMESPACE}
-                kubectl rollout status deployment/frontend -n \${NAMESPACE}
+                    kubectl rollout status deployment/backend -n \${NAMESPACE}
+                    kubectl rollout status deployment/frontend -n \${NAMESPACE}
                 """
             }
         }
