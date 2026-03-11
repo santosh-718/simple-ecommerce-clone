@@ -58,55 +58,33 @@ pipeline {
 
         stage('Deploy to EKS') {
             steps {
-                sh """
-                    aws eks --region \${AWS_REGION} update-kubeconfig --name \${CLUSTER_NAME}
+                sh '''
+                    aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
 
                     # Ensure namespace exists
-                    kubectl create namespace \${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-                    kubectl apply -f k8s/gp3-storageclass.yaml
+                    kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                    
+                    # Apply new StorageClass with Immediate binding
+                    kubectl apply -f k8s/gp3-immediate-storageclass.yaml
 
-                    # Clean up old PVC/PV if stuck
-                    kubectl delete pvc postgres-pvc -n \${NAMESPACE} --ignore-not-found --grace-period=0 --force
-                    kubectl patch pvc postgres-pvc -n \${NAMESPACE} -p '{"metadata":{"finalizers":null}}' --type=merge || true
+                    # Delete old PVC if exists
+                    kubectl delete pvc postgres-pvc -n ${NAMESPACE} --ignore-not-found --grace-period=0 --force
+                    kubectl patch pvc postgres-pvc -n ${NAMESPACE} -p '{"metadata":{"finalizers":null}}' --type=merge || true
                     kubectl delete pv -l claimName=postgres-pvc --ignore-not-found --grace-period=0 --force
 
-                    # Wait until PVC is fully gone before re-creating
-                    for i in {1..30}; do
-                        exists=\$(kubectl get pvc postgres-pvc -n \${NAMESPACE} --ignore-not-found)
-                        if [ -z "\$exists" ]; then
-                            echo "PVC fully removed"
-                            break
-                        fi
-                        echo "PVC still exists... waiting"
-                        sleep 5
-                    done
-
-                    # Apply PVC fresh
-                    kubectl apply -f k8s/postgres-pvc.yaml -n \${NAMESPACE}
+                    # Apply PVC with gp3-immediate
+                    kubectl apply -f k8s/postgres-pvc.yaml -n ${NAMESPACE}
 
                     # Deploy Postgres
-                    kubectl apply -f k8s/postgres-deployment.yaml -n \${NAMESPACE}
-                    kubectl apply -f k8s/postgres-service.yaml -n \${NAMESPACE}
+                    kubectl apply -f k8s/postgres-deployment.yaml -n ${NAMESPACE}
+                    kubectl apply -f k8s/postgres-service.yaml -n ${NAMESPACE}
 
                     # Wait for PVC to bind
-                    for i in {1..60}; do
-                        phase=\$(kubectl get pvc postgres-pvc -n \${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
-                        if [ "\$phase" = "Bound" ]; then
-                            echo "PVC is bound!"
-                            break
-                        fi
-                        echo "PVC phase: \$phase (waiting...)"
-                        sleep 10
-                    done
-
-                    if [ "\$phase" != "Bound" ]; then
-                        echo "PVC did not bind. Check EBS CSI driver and IAM permissions."
-                        exit 1
-                    fi
+                    kubectl wait --for=condition=Bound pvc/postgres-pvc -n ${NAMESPACE} --timeout=300s
 
                     # Wait for Postgres rollout
-                    kubectl rollout status deployment/postgres -n \${NAMESPACE} --timeout=300s
-                """
+                    kubectl rollout status deployment/postgres -n ${NAMESPACE} --timeout=300s
+                '''
             }
         }
 
