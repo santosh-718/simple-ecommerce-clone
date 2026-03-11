@@ -64,23 +64,22 @@ pipeline {
 
                 # Ensure namespace exists
                 kubectl create namespace \${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-
                 # Apply PVC
-                kubectl apply -f k8s/postgres-pvc.yaml -n \${NAMESPACE}
+                kubectl apply -f k8s/postgres-pvc.yaml -n ${NAMESPACE}
 
-                # Deploy Postgres (this triggers PVC binding because of WaitForFirstConsumer)
-                kubectl apply -f k8s/postgres-deployment.yaml -n \${NAMESPACE}
-                kubectl apply -f k8s/postgres-service.yaml -n \${NAMESPACE}
+                # Deploy Postgres (triggers PVC binding)
+                kubectl apply -f k8s/postgres-deployment.yaml -n ${NAMESPACE}
+                kubectl apply -f k8s/postgres-service.yaml -n ${NAMESPACE}
 
-                # Wait for PVC to bind (loop until Bound)
+                # Now wait for PVC to bind
                 for i in {1..60}; do
-                  phase=\$(kubectl get pvc postgres-pvc -n \${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
-                  if [ "\$phase" = "Bound" ]; then
-                    echo "PVC is bound!"
-                    break
-                  fi
-                  echo "PVC phase: \$phase (waiting...)"
-                  sleep 10
+                   phase=$(kubectl get pvc postgres-pvc -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+                   if [ "$phase" = "Bound" ]; then
+                      echo "PVC is bound!"
+                      break
+                   fi
+                   echo "PVC phase: $phase (waiting...)"
+                   sleep 10
                 done
 
                 if [ "\$phase" != "Bound" ]; then
