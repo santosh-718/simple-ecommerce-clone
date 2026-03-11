@@ -74,7 +74,7 @@ pipeline {
                 # Apply PVC fresh
                 kubectl apply -f k8s/postgres-pvc.yaml -n \${NAMESPACE}
 
-                # Deploy Postgres (this triggers PVC binding because of WaitForFirstConsumer)
+                # Deploy Postgres
                 kubectl apply -f k8s/postgres-deployment.yaml -n \${NAMESPACE}
                 kubectl apply -f k8s/postgres-service.yaml -n \${NAMESPACE}
 
