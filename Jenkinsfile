@@ -96,20 +96,6 @@ pipeline {
 
                 # Wait for Postgres rollout
                 kubectl rollout status deployment/postgres -n \${NAMESPACE} --timeout=300s
-
-                # Init DB Job
-                kubectl delete job init-db -n \${NAMESPACE} --ignore-not-found
-                kubectl apply -f k8s/init-db-job.yaml -n \${NAMESPACE}
-
-                # Deploy backend/frontend
-                kubectl apply -f k8s/backend-deployment.yaml -n \${NAMESPACE}
-                kubectl apply -f k8s/backend-service.yaml -n \${NAMESPACE}
-                kubectl apply -f k8s/frontend-deployment.yaml -n \${NAMESPACE}
-                kubectl apply -f k8s/frontend-service.yaml -n \${NAMESPACE}
-
-                # Rolling update with new images
-                kubectl set image deployment/backend backend=\${ECR_BACKEND}:${IMAGE_TAG} -n \${NAMESPACE}
-                kubectl set image deployment/frontend frontend=\${ECR_FRONTEND}:${IMAGE_TAG} -n \${NAMESPACE}
                 """
             }
         }
